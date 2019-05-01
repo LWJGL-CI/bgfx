@@ -1,33 +1,42 @@
+dist: trusty
+sudo: false
+git:
+  depth: 3
+env:
+  global:
+  - secure: "OKc6Mojr/tBf2AP0IwZBeey0NXfrdxesfPhXlHPVQfbT4RbZwfaLnLbKsPV2MCRo0j5+vCxTiEEg+2tKIfpwOASyD8P0Qh3Isa4DjtueB8M/tdCzWYLGxJ6poGjMjd8cLUoExBfiNO7CL32B4Z83IEbpzC2ScPJRBnI2pmvCmniB9Wqt3yQUnlVc96e009ubrs6G5uMfzelAkVBsm9BexFxCtPBM5G6T8RDTKQ6h27pQlBjQnNn6s8JAod6u5byN4tmApW7ockham3sQ1c1+vTqnt97a6MS2O+G4/FdkJ/ex3I99wl1xHH6C89IicgN/xX+P/9JL4AWYP778AtRIXeSk3G6wMaWzeNYD+36T5iTvqniY0rqgPOcpnf78TjueUn57crqdt5tWaFUME7AB8/mSqPgKiiC1wuAoz85h/AOeiRtxd7zAHLk+blvIWOR+Z5yuHwCRFA7eemXriTfUU2LczS229IgD4yyqMYMVOksmo5bPmPL/vPsl0aIXQLEBS91OFxQKMPQu9gSJ3dqiObmhVnJ7OOhBxJ8deAC81nn76v6UaE7O0g4RiDeytOhiap/4MUjLDi9aR9WOX3rTvI5ZFxtKMMvFFjgs/0reWfdqW8kzCfPLzzaV83oYjsc5hhrQBBFN5gEbRwoIXdHvHMhqBU76jmQJF+J/KMcxGk4="
+  - secure: "JDqvzWz0yehxBWzggNcRg2TUUolL0lX2y/ErBexkLmvNnUha8tU7IdN+2wcmiv2Jmhjnkv4hpvIMFqkiu2Nl2Lib+77lu22jLBkmwcfQzEdujmam7jkWr7Y/RxmF9FhkNViJ80/rtgCyGEHGBmMohJ90++Ix3FgMTIH6UbHbb6wGDAkN6C3KnBBPvjK/rIj3MuVFc0q7vVHTIRCAFZ/b6zDGozlDorbqt0yKEhQBW/U/f4jkeuYzjsHdKNtWzdf1VFaZz2YxynM6OE9k4rbWpPPeAM2gOp2+mAEbEZzavgXkNpEu3rvdGBjeQEyEpV57R2KE4xodp3xmXoIF4s05xAo4sn3VzGdtBG8mRxfaUczKr43Ys3wIv13zXYCsmb1NF9xG8SGueRdEK+r2BY6wtLj6K/lG3NEx25UPfp16OQoEzHI8F7yNmVGyb3oKphrq+7OJgUOyeL8OQAiQiK0lTuEr6T+0r36AmhdKKOsQxO8vGLhIAUjRSC6tcMERK4rHQFbgiPEFeA9yBJ9MSbVGOzgietlxS1hV1CidTcrdb+LweSDRY/sNpe/B2HGRKhycXRcAwhf4R1kQ4/G9KqitF13BNzNX6rnkUt0fHaH3kddSR1CkgFFF9sZ12bnRJQK8Til1KwLmzaL0pcsAGe+DAYUxulQKDwOUVbZU2nLmoiA="
 language: cpp
-matrix:
-  include:
-    - compiler: gcc
-      os: linux
-    - compiler: clang
-      os: osx
+compiler: gcc
 
 addons:
   apt:
     sources:
     - ubuntu-toolchain-r-test
     packages:
-    - gcc-8
-    - g++-8
-    - clang
+    - gcc-5
+    - g++-5
 
 before_script:
-  - git clone --depth 1 https://github.com/bkaradzic/bx ../bx
-  - git clone --depth 1 https://github.com/bkaradzic/bimg ../bimg
+- git clone --depth 1 https://github.com/LWJGL-CI/bx.git ../bx
+- git clone --depth 1 https://github.com/LWJGL-CI/bimg.git ../bimg
+
+before_install:
+- pip install --user awscli
+- export PATH=$PATH:$HOME/.local/bin
 
 script:
-  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then make build CXX="g++-8" CC="gcc-8"; fi
-  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then make build; fi
-
-branches:
-  only:
-    - master
-
-notifications:
-  email: false
-
-osx_image: xcode9.3
+- ../bx/tools/bin/linux/genie --with-shared-lib --with-tools --gcc=linux-gcc gmake
+- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" LDFLAGS=-Wl,--wrap,memcpy bgfx-shared-lib
+- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" geometryc
+- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" texturec
+- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" texturev
+- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" shaderc
+- strip .build/linux64_gcc/bin/libbgfx-shared-libRelease.so
+- "aws s3 cp .build/linux64_gcc/bin/libbgfx-shared-libRelease.so s3://build.lwjgl.org/nightly/linux/x64/libbgfx.so --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libbgfx.so.git"
+- "aws s3 cp libbgfx.so.git s3://build.lwjgl.org/nightly/linux/x64/ --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp .build/linux64_gcc/bin/geometrycRelease s3://build.lwjgl.org/nightly/linux/x64/bgfx-tools/geometryc --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp .build/linux64_gcc/bin/texturecRelease s3://build.lwjgl.org/nightly/linux/x64/bgfx-tools/texturec --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp .build/linux64_gcc/bin/texturevRelease s3://build.lwjgl.org/nightly/linux/x64/bgfx-tools/texturev --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp .build/linux64_gcc/bin/shadercRelease s3://build.lwjgl.org/nightly/linux/x64/bgfx-tools/shaderc --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
