@@ -1,4 +1,4 @@
-dist: trusty
+dist: xenial
 sudo: false
 git:
   depth: 3
@@ -11,11 +11,10 @@ compiler: gcc
 
 addons:
   apt:
-    sources:
-    - ubuntu-toolchain-r-test
     packages:
-    - gcc-5
-    - g++-5
+    - gcc-arm-linux-gnueabihf
+    - g++-arm-linux-gnueabihf
+    - libc6-dev-armhf-cross
 
 before_script:
 - git clone --depth 1 https://github.com/LWJGL-CI/bx.git ../bx
@@ -24,19 +23,30 @@ before_script:
 before_install:
 - pip install --user awscli
 - export PATH=$PATH:$HOME/.local/bin
+- sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+- cat /etc/apt/sources.list
+- sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+- sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+- sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+- cat /etc/apt/sources.list.d/ports.list
+- sudo dpkg --add-architecture armhf
+- sudo apt-get update || true
+- sudo apt-get -yq --no-install-suggests --no-install-recommends install mesa-common-dev:armhf -o Dpkg::Options::="--force-overwrite"
 
 script:
-- ../bx/tools/bin/linux/genie --with-shared-lib --with-tools --gcc=linux-gcc gmake
-- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" LDFLAGS=-Wl,--wrap,memcpy bgfx-shared-lib
-- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" geometryc
-- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" texturec
-- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" texturev
-- make -R -C .build/projects/gmake-linux config=release64 CXX="g++-5" CC="gcc-5" shaderc
-- strip .build/linux64_gcc/bin/libbgfx-shared-libRelease.so
-- "aws s3 cp .build/linux64_gcc/bin/libbgfx-shared-libRelease.so s3://build.lwjgl.org/nightly/linux/x64/libbgfx.so --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- sed -i 's/strip -s/arm-linux-gnueabihf-strip/' ../bx/scripts/toolchain.lua
+- ../bx/tools/bin/linux/genie --with-shared-lib --with-tools --gcc=linux-arm-gcc gmake
+- make -R -C .build/projects/gmake-linux-arm-gcc config=release CXX="arm-linux-gnueabihf-g++" CC="arm-linux-gnueabihf-gcc" CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" LDFLAGS=-Wl,--wrap,memcpy bgfx-shared-lib
+- make -R -C .build/projects/gmake-linux-arm-gcc config=release CXX="arm-linux-gnueabihf-g++" CC="arm-linux-gnueabihf-gcc" geometryc
+- make -R -C .build/projects/gmake-linux-arm-gcc config=release CXX="arm-linux-gnueabihf-g++" CC="arm-linux-gnueabihf-gcc" texturec
+- make -R -C .build/projects/gmake-linux-arm-gcc config=release CXX="arm-linux-gnueabihf-g++" CC="arm-linux-gnueabihf-gcc" texturev
+- make -R -C .build/projects/gmake-linux-arm-gcc config=release CXX="arm-linux-gnueabihf-g++" CC="arm-linux-gnueabihf-gcc" shaderc
+- ls -la .build/linux32_arm_gcc/bin/
+- arm-linux-gnueabihf-strip .build/linux32_arm_gcc/bin/libbgfx-shared-libRelease.so
+- "aws s3 cp .build/linux32_arm_gcc/bin/libbgfx-shared-libRelease.so s3://build.lwjgl.org/nightly/linux/arm32/libbgfx.so --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
 - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libbgfx.so.git"
-- "aws s3 cp libbgfx.so.git s3://build.lwjgl.org/nightly/linux/x64/ --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
-- "aws s3 cp .build/linux64_gcc/bin/geometrycRelease s3://build.lwjgl.org/nightly/linux/x64/bgfx-tools/geometryc --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
-- "aws s3 cp .build/linux64_gcc/bin/texturecRelease s3://build.lwjgl.org/nightly/linux/x64/bgfx-tools/texturec --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
-- "aws s3 cp .build/linux64_gcc/bin/texturevRelease s3://build.lwjgl.org/nightly/linux/x64/bgfx-tools/texturev --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
-- "aws s3 cp .build/linux64_gcc/bin/shadercRelease s3://build.lwjgl.org/nightly/linux/x64/bgfx-tools/shaderc --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp libbgfx.so.git s3://build.lwjgl.org/nightly/linux/arm32/ --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp .build/linux32_arm_gcc/bin/geometrycRelease s3://build.lwjgl.org/nightly/linux/arm32/bgfx-tools/geometryc --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp .build/linux32_arm_gcc/bin/texturecRelease s3://build.lwjgl.org/nightly/linux/arm32/bgfx-tools/texturec --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp .build/linux32_arm_gcc/bin/texturevRelease s3://build.lwjgl.org/nightly/linux/arm32/bgfx-tools/texturev --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp .build/linux32_arm_gcc/bin/shadercRelease s3://build.lwjgl.org/nightly/linux/arm32/bgfx-tools/shaderc --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
