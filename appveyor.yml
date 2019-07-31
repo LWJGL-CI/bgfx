@@ -1,0 +1,64 @@
+version: '{build}'
+skip_tags: true
+image: Visual Studio 2019
+clone_depth: 3
+environment:
+  AWS_ACCESS_KEY_ID:
+    secure: 7jhk0oV/vjFsOcsAHLMUcNGUGLuGmnuPxGH0ce/Vky8=
+  AWS_SECRET_ACCESS_KEY:
+    secure: 5KKYpsIHwYHHh5ud0U7Ss0rLumv6G8tkS6abh1B9aq4wY6+1kq5fN/3E5BsdBVKy
+  AWS_DEFAULT_REGION: us-east-1
+  S3_CONFIG_VOLATILE: --acl public-read --cache-control "public, must-revalidate, proxy-revalidate, max-age=0"
+  GIT_FORMAT: '%%H'
+  matrix:
+  - ARCH: x64
+    PLATFORM: amd64
+    BUILD: x64
+    WIN: 64
+  - ARCH: x86
+    PLATFORM: amd64_x86
+    BUILD: Win32
+    WIN: 32
+matrix:
+  fast_finish: true
+install:
+- git clone https://github.com/LWJGL-CI/bx.git ../bx
+- git clone https://github.com/LWJGL-CI/bimg.git ../bimg
+build_script:
+- cmd: >-
+    "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" %PLATFORM%
+
+    ..\bx\tools\bin\windows\genie --with-shared-lib --with-tools vs2019 --platform x%WIN%
+
+    devenv .build\projects\vs2019\bgfx.sln /Project bgfx-shared-lib /Build "Release|%BUILD%"
+
+    devenv .build\projects\vs2019\bgfx.sln /Project geometryc /Build "Release|%BUILD%"
+
+    devenv .build\projects\vs2019\bgfx.sln /Project texturec /Build "Release|%BUILD%"
+
+    devenv .build\projects\vs2019\bgfx.sln /Project texturev /Build "Release|%BUILD%"
+
+    devenv .build\projects\vs2019\bgfx.sln /Project "shaderc (tools\shaderc\shaderc)" /Build "Release|%BUILD%"
+
+    aws s3 cp .build/win%WIN%_vs2019/bin/bgfx-shared-libRelease.dll s3://build.lwjgl.org/nightly/windows/%ARCH%/bgfx.dll %S3_CONFIG_VOLATILE%
+
+    git log --first-parent --pretty=format:%GIT_FORMAT% HEAD~2..HEAD~1 > revision.git
+
+    aws s3 cp revision.git s3://build.lwjgl.org/nightly/windows/%ARCH%/bgfx.dll.git %S3_CONFIG_VOLATILE%
+
+    aws s3 cp .build/win%WIN%_vs2019/bin/geometrycRelease.exe s3://build.lwjgl.org/nightly/windows/%ARCH%/bgfx-tools/geometryc.exe %S3_CONFIG_VOLATILE%
+
+    aws s3 cp .build/win%WIN%_vs2019/bin/texturecRelease.exe s3://build.lwjgl.org/nightly/windows/%ARCH%/bgfx-tools/texturec.exe %S3_CONFIG_VOLATILE%
+
+    aws s3 cp .build/win%WIN%_vs2019/bin/texturevRelease.exe s3://build.lwjgl.org/nightly/windows/%ARCH%/bgfx-tools/texturev.exe %S3_CONFIG_VOLATILE%
+
+    aws s3 cp .build/win%WIN%_vs2019/bin/shadercRelease.exe s3://build.lwjgl.org/nightly/windows/%ARCH%/bgfx-tools/shaderc.exe %S3_CONFIG_VOLATILE%
+test: off
+notifications:
+- provider: Email
+  to:
+  - iotsakp@gmail.com
+  subject: bgfx CI
+  on_build_success: true
+  on_build_failure: true
+  on_build_status_changed: true

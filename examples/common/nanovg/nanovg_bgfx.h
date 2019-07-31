@@ -7,6 +7,7 @@
 #define NANOVG_BGFX_H_HEADER_GUARD
 
 #include <bgfx/bgfx.h>
+#include <bgfx/c99/bgfx.h>
 
 namespace bx { struct AllocatorI; }
 
@@ -21,19 +22,19 @@ struct NVGLUframebuffer
 };
 
 ///
-NVGcontext* nvgCreate(int32_t _edgeaa, bgfx::ViewId _viewId, bx::AllocatorI* _allocator);
+BGFX_C_API NVGcontext* nvgCreate(int32_t _edgeaa, bgfx::ViewId _viewId, bx::AllocatorI* _allocator);
 
 ///
 NVGcontext* nvgCreate(int32_t _edgeaa, bgfx::ViewId _viewId);
 
 ///
-void nvgDelete(NVGcontext* _ctx);
+BGFX_C_API void nvgDelete(NVGcontext* _ctx);
 
 ///
-void nvgSetViewId(NVGcontext* _ctx, bgfx::ViewId _viewId);
+BGFX_C_API void nvgSetViewId(NVGcontext* _ctx, bgfx::ViewId _viewId);
 
 ///
-uint16_t nvgGetViewId(struct NVGcontext* _ctx);
+BGFX_C_API uint16_t nvgGetViewId(struct NVGcontext* _ctx);
 
 // Helper functions to create bgfx framebuffer to render to.
 // Example:
@@ -59,21 +60,15 @@ uint16_t nvgGetViewId(struct NVGcontext* _ctx);
 NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _width, int32_t _height, int32_t _imageFlags, bgfx::ViewId _viewId);
 
 ///
-NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _width, int32_t _height, int32_t _imageFlags);
+BGFX_C_API NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _width, int32_t _height, int32_t _imageFlags);
 
 ///
-NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _imageFlags, bgfx::ViewId _viewId);
+BGFX_C_API void nvgluBindFramebuffer(NVGLUframebuffer* _framebuffer);
 
 ///
-NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _imageFlags);
+BGFX_C_API void nvgluDeleteFramebuffer(NVGLUframebuffer* _framebuffer);
 
 ///
-void nvgluBindFramebuffer(NVGLUframebuffer* _framebuffer);
-
-///
-void nvgluDeleteFramebuffer(NVGLUframebuffer* _framebuffer);
-
-///
-void nvgluSetViewFramebuffer(bgfx::ViewId _viewId, NVGLUframebuffer* _framebuffer);
+BGFX_C_API void nvgluSetViewFramebuffer(bgfx::ViewId _viewId, NVGLUframebuffer* _framebuffer);
 
 #endif // NANOVG_BGFX_H_HEADER_GUARD

@@ -64,6 +64,10 @@ function bgfxProjectBase(_kind, _defines)
 			buildoptions {
 				"-fPIC",
 			}
+			links {
+				"X11",
+               	"GL",
+			}
 
 		configuration {}
 	end
@@ -148,11 +152,20 @@ function bgfxProjectBase(_kind, _defines)
 		path.join(BGFX_DIR, "src/**.cpp"),
 		path.join(BGFX_DIR, "src/**.h"),
 		path.join(BGFX_DIR, "scripts/**.natvis"),
+		path.join(BGFX_DIR, "examples/common/nanovg/**.cpp"),
+		path.join(BGFX_DIR, "examples/common/nanovg/**.h"),
 	}
 
 	removefiles {
 		path.join(BGFX_DIR, "src/**.bin.h"),
+		path.join(BGFX_DIR, "examples/common/nanovg/nanovg.cpp"),
+		path.join(BGFX_DIR, "examples/common/nanovg/**.bin.h"),
 	}
+
+	configuration { "linux-gcc" }
+		files {
+			path.join(BGFX_DIR, "src/wrap_memcpy.c")
+		}
 
 	overridefiles(BGFX_DIR, path.join(BGFX_DIR, "../bgfx-gnm"), {
 		path.join(BGFX_DIR, "src/renderer_gnm.cpp"),
