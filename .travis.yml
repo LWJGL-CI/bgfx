@@ -140,6 +140,53 @@ matrix:
     - "aws s3 cp libbgfx.so.git s3://build.lwjgl.org/nightly/linux/arm64/ $S3_PARAMS"
 
   # -----------------
+  - name: "Linux mips64"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        - gcc-5-mips64el-linux-gnuabi64
+        - g++-5-mips64el-linux-gnuabi64
+        - libc6-dev-mips64el-cross
+
+    before_script:
+    - git clone --depth 1 https://github.com/LWJGL-CI/bx.git ../bx
+    - git clone --depth 1 https://github.com/LWJGL-CI/bimg.git ../bimg
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+    - sudo rm -rf /etc/apt/sources.list
+    - sudo sh -c "echo 'deb http://deb.debian.org/debian stretch main' >> /etc/apt/sources.list"
+    - sudo dpkg --add-architecture mips64el
+    - sudo apt-get update || true
+    - sudo apt-get -yq -f --allow-unauthenticated --no-install-suggests --no-install-recommends install libgl1-mesa-dev:mips64el x11proto-core-dev:mips64el libx11-dev:mips64el mesa-common-dev:mips64el libgl1-mesa-glx:mips64el libdrm-dev:mips64el libdrm2:mips64el libdrm-radeon1:mips64el libdrm-nouveau2:mips64el libdrm-amdgpu1:mips64el libglapi-mesa:mips64el -o Dpkg::Options::="--force-overwrite"
+    - sudo ln -s /usr/lib/mips64el-linux-gnuabi64/mesa/libGL.so.1 /usr/lib/libGL.so
+
+    script:
+    - sed -i 's/strip -s/mips64el-linux-gnuabi64-strip/' ../bx/scripts/toolchain.lua
+    - ../bx/tools/bin/linux/genie --with-shared-lib --gcc=linux-mips-gcc gmake
+    - sed -i 's/ -m64//' .build/projects/gmake-linux-mips-gcc/bgfx.make
+    - sed -i 's/ -m64//' .build/projects/gmake-linux-mips-gcc/bgfx-shared-lib.make
+    - sed -i 's/ -m64//' .build/projects/gmake-linux-mips-gcc/bimg.make
+    - sed -i 's/ -m64//' .build/projects/gmake-linux-mips-gcc/bimg_decode.make
+    - sed -i 's/ -m64//' .build/projects/gmake-linux-mips-gcc/bx.make
+    - sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-mips-gcc/bgfx.make
+    - sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-mips-gcc/bgfx-shared-lib.make
+    - sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-mips-gcc/bimg.make
+    - sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-mips-gcc/bimg_decode.make
+    - sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-mips-gcc/bx.make
+    - make -R -C .build/projects/gmake-linux-mips-gcc config=release64 CXX="mips64el-linux-gnuabi64-g++-5" CC="mips64el-linux-gnuabi64-gcc-5" CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" bgfx-shared-lib
+    - mips64el-linux-gnuabi64-strip .build/linux64_mips_gcc/bin/libbgfx-shared-libRelease.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libbgfx.so.git"
+    - "aws s3 cp .build/linux64_mips_gcc/bin/libbgfx-shared-libRelease.so s3://build.lwjgl.org/nightly/linux/mips64/libbgfx.so $S3_PARAMS"
+    - "aws s3 cp libbgfx.so.git s3://build.lwjgl.org/nightly/linux/mips64/ $S3_PARAMS"
+
+  # -----------------
   - name: "macOS"
   # -----------------
     language: objective-c
