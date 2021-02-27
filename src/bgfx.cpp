@@ -3637,6 +3637,7 @@ namespace bgfx
 		, callback(NULL)
 		, allocator(NULL)
 	{
+		bx::memCopy(&this->platformData, &g_platformData, sizeof(PlatformData) );
 	}
 
 	void Attachment::init(TextureHandle _handle, Access::Enum _access, uint16_t _layer, uint16_t _numLayers, uint16_t _mip, uint8_t _resolve)

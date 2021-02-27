@@ -1,0 +1,462 @@
+name: LWJGL Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  S3_PARAMS: --cache-control "public,must-revalidate,proxy-revalidate,max-age=0"
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    container:
+      image: almalinux:8
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x64]
+        include:
+          - ARCH: x64
+            PACKAGES: mesa-libGL-devel xorg-x11-proto-devel libX11-devel
+            OUTPUT_DIR: linux64_gcc
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install git
+        run: dnf -y install git
+      - name: Clone repository
+        run: git clone --depth 4 https://github.com/${{ github.repository }}.git .
+      - name: Install build dependencies
+        run: |
+          dnf -y install epel-release wget
+          wget https://pkgs.sysadmins.ws/el8/base/x86_64/raven-release-1.0.1-1.el8.noarch.rpm
+          rpm -ivh raven-release-1.0.1-1.el8.noarch.rpm
+          dnf config-manager --set-enabled powertools
+          dnf config-manager --set-enabled raven-extras
+          dnf -y update
+          dnf -y install gcc-toolset-15-gcc gcc-toolset-15-gcc-c++ awscli git
+      - name: Clone bx & bimg
+        run: |
+          git clone https://github.com/LWJGL-CI/bx.git ../bx
+          git clone https://github.com/LWJGL-CI/bimg.git ../bimg
+      - name: Clone and build GENie
+        run: |
+          source /opt/rh/gcc-toolset-15/enable || true
+          git clone https://github.com/LWJGL-CI/GENie.git ../GENie
+          cd ../GENie
+          make
+      - name: Install bgfx dependencies
+        run: dnf -y install ${{matrix.PACKAGES}}
+      - name: Build
+        run: | #sudo ln -s /usr/lib/x86_64-linux-gnu/mesa/libGL.so.1 /usr/lib/libGL.so
+          source /opt/rh/gcc-toolset-15/enable || true
+          ../GENie/bin/linux/genie --with-shared-lib --with-tools --gcc=linux-gcc gmake
+          gmake -j8 -R -C .build/projects/gmake-linux-gcc config=release64 \
+            CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" \
+            bgfx-shared-lib
+          strip .build/linux64_gcc/bin/libbgfx-shared-libRelease.so
+      - name: Build geometryc
+        run: |
+          source /opt/rh/gcc-toolset-15/enable || true
+          gmake -j8 -R -C .build/projects/gmake-linux-gcc config=release64 geometryc
+      - name: Build texturec
+        run: |
+          source /opt/rh/gcc-toolset-15/enable || true
+          gmake -j8 -R -C .build/projects/gmake-linux-gcc config=release64 texturec
+      - name: Build texturev
+        run: |
+          source /opt/rh/gcc-toolset-15/enable || true
+          gmake -j8 -R -C .build/projects/gmake-linux-gcc config=release64 texturev
+      - name: Build shaderc
+        run: |
+          source /opt/rh/gcc-toolset-15/enable || true
+          gmake -j8 -R -C .build/projects/gmake-linux-gcc config=release64 shaderc
+      - name: Upload artifact
+        run: aws s3 cp .build/${{matrix.OUTPUT_DIR}}/bin/libbgfx-shared-libRelease.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/libbgfx.so ${{env.S3_PARAMS}}
+      - name: Upload tools
+        run: |
+          aws s3 cp .build/linux64_gcc/bin/geometrycRelease s3://lwjgl-build/nightly/linux/x64/bgfx-tools/geometryc ${{env.S3_PARAMS}}
+          aws s3 cp .build/linux64_gcc/bin/texturecRelease s3://lwjgl-build/nightly/linux/x64/bgfx-tools/texturec ${{env.S3_PARAMS}}
+          aws s3 cp .build/linux64_gcc/bin/texturevRelease s3://lwjgl-build/nightly/linux/x64/bgfx-tools/texturev ${{env.S3_PARAMS}}
+          aws s3 cp .build/linux64_gcc/bin/shadercRelease s3://lwjgl-build/nightly/linux/x64/bgfx-tools/shaderc ${{env.S3_PARAMS}}
+      - name: Upload git revision
+        run: |
+          git config --global --add safe.directory $PWD
+          git log --first-parent --pretty=format:%H HEAD~3..HEAD~2 > libbgfx.so.git
+          aws s3 cp libbgfx.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ ${{env.S3_PARAMS}}
+
+  linux-cross:
+    name: Linux Cross
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [arm32, arm64, ppc64le]
+        include:
+          # -----
+          - ARCH: arm32
+            CROSS_ARCH: armhf
+            TRIPLET: arm-linux-gnueabihf
+            FLAVOR: linux-arm-gcc
+          # -----
+          - ARCH: arm64
+            CROSS_ARCH: arm64
+            TRIPLET: aarch64-linux-gnu
+            FLAVOR: linux-arm-gcc
+          # -----
+          - ARCH: ppc64le
+            CROSS_ARCH: ppc64el
+            TRIPLET: powerpc64le-linux-gnu
+            FLAVOR: linux-ppc64le-gcc
+    env:
+      LWJGL_ARCH: ${{matrix.ARCH}}
+      MATRIX_FLAVOR: ${{matrix.FLAVOR}}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 4
+      - name: Install dependencies
+        run: |
+          DEBIAN_FRONTEND=noninteractive sudo apt-get -yq update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install cmake build-essential gcc-12-${{matrix.TRIPLET}} g++-12-${{matrix.TRIPLET}} libc6-dev-${{matrix.CROSS_ARCH}}-cross
+      - name: Clone bx & bimg
+        run: |
+          git clone https://github.com/LWJGL-CI/bx.git ../bx --depth=1
+          git clone https://github.com/LWJGL-CI/bimg.git ../bimg --depth=1
+      - name: Clone and build GENie
+        run: |
+          git clone https://github.com/LWJGL-CI/GENie.git ../GENie
+          cd ../GENie
+          make -j8
+      - name: Prepare cross-compilation for ${{matrix.CROSS_ARCH}}
+        run: |
+          sudo grep 'deb ' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+          sudo sed -i 's/^deb /deb [arch=amd64] /' /etc/apt/sources.list
+          sudo sed -i 's#^deb [^ ]\+#deb [arch=${{matrix.CROSS_ARCH}}] https://ports.ubuntu.com/ubuntu-ports/#' /etc/apt/sources.list.d/ports.list
+          sudo dpkg --add-architecture ${{matrix.CROSS_ARCH}}
+          sudo apt-get update || true
+      - name: Install cross-compilation dependencies
+        run: |
+          DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install \
+            libgl1-mesa-dev:${{matrix.CROSS_ARCH}} \
+            x11proto-dev:${{matrix.CROSS_ARCH}} \
+            libx11-dev:${{matrix.CROSS_ARCH}}
+      - name: Build bgfx for ${{matrix.CROSS_ARCH}}
+        run: |
+          sed -i 's/strip -s/${{matrix.TRIPLET}}-strip/' ../bx/scripts/toolchain.lua
+          ../GENie/bin/linux/genie --with-shared-lib --gcc=${{matrix.FLAVOR}} gmake
+          make -j8 -R -C .build/projects/gmake-${{matrix.FLAVOR}} config=release \
+            CXX="${{matrix.TRIPLET}}-g++-12" \
+            CC="${{matrix.TRIPLET}}-gcc-12" \
+            CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" \
+            bgfx-shared-lib
+          ${{matrix.TRIPLET}}-strip .build/${MATRIX_FLAVOR//-/_}/bin/libbgfx-shared-libRelease.so
+      - name: Upload artifact
+        run: aws s3 cp .build/${MATRIX_FLAVOR//-/_}/bin/libbgfx-shared-libRelease.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/libbgfx.so ${{env.S3_PARAMS}}
+      - name: Upload git revision
+        run: |
+          git config --global --add safe.directory $(pwd)
+          git log --first-parent --pretty=format:%H HEAD~3..HEAD~2 > libbgfx.so.git
+          aws s3 cp libbgfx.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ ${{env.S3_PARAMS}}
+
+  # switch to Clang/LLVM for RISC-V, due to code model issues with GCC
+  linux-cross-llvm:
+    name: Linux Cross (Clang/LLVM)
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [riscv64]
+        include:
+          - ARCH: riscv64
+            CROSS_ARCH: riscv64
+            TRIPLET: riscv64-linux-gnu
+            FLAVOR: linux-riscv64-gcc
+    env:
+      LWJGL_ARCH: ${{matrix.ARCH}}
+      MATRIX_FLAVOR: ${{matrix.FLAVOR}}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 4
+      - name: Install dependencies
+        run: |
+          DEBIAN_FRONTEND=noninteractive sudo apt-get -yq update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install cmake build-essential clang-15 lld-15 llvm-15 gcc-12-${{matrix.TRIPLET}} g++-12-${{matrix.TRIPLET}} libc6-dev-${{matrix.CROSS_ARCH}}-cross
+      - name: Clone bx & bimg
+        run: |
+          git clone https://github.com/LWJGL-CI/bx.git ../bx --depth=1
+          git clone https://github.com/LWJGL-CI/bimg.git ../bimg --depth=1
+      - name: Clone and build GENie
+        run: |
+          git clone https://github.com/LWJGL-CI/GENie.git ../GENie
+          cd ../GENie
+          make -j8
+      - name: Prepare cross-compilation for ${{matrix.CROSS_ARCH}}
+        run: |
+          sudo grep 'deb ' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+          sudo sed -i 's/^deb /deb [arch=amd64] /' /etc/apt/sources.list
+          sudo sed -i 's#^deb [^ ]\+#deb [arch=${{matrix.CROSS_ARCH}}] https://ports.ubuntu.com/ubuntu-ports/#' /etc/apt/sources.list.d/ports.list
+          sudo dpkg --add-architecture ${{matrix.CROSS_ARCH}}
+          sudo apt-get update || true
+      - name: Install cross-compilation dependencies
+        run: |
+          DEBIAN_FRONTEND=noninteractive sudo apt-get -yq install \
+            libgl1-mesa-dev:${{matrix.CROSS_ARCH}} \
+            x11proto-dev:${{matrix.CROSS_ARCH}} \
+            libx11-dev:${{matrix.CROSS_ARCH}}
+      - name: Build bgfx for ${{matrix.CROSS_ARCH}}
+        run: |
+          sed -i 's/strip -s/llvm-strip-15/' ../bx/scripts/toolchain.lua
+          ../GENie/bin/linux/genie --with-shared-lib --gcc=${{matrix.FLAVOR}} gmake
+          make -j8 -R -C .build/projects/gmake-${{matrix.FLAVOR}} config=release \
+            CXX="clang++-15" \
+            CC="clang-15" \
+            AR="llvm-ar-15" \
+            RANLIB="llvm-ranlib-15" \
+            CFLAGS="--target=${{matrix.TRIPLET}} -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" \
+            LDFLAGS="--target=${{matrix.TRIPLET}}" \
+            bgfx-shared-lib
+          llvm-strip-15 .build/${MATRIX_FLAVOR//-/_}/bin/libbgfx-shared-libRelease.so
+      - name: Upload artifact
+        run: aws s3 cp .build/${MATRIX_FLAVOR//-/_}/bin/libbgfx-shared-libRelease.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/libbgfx.so ${{env.S3_PARAMS}}
+      - name: Upload git revision
+        run: |
+          git config --global --add safe.directory $(pwd)
+          git log --first-parent --pretty=format:%H HEAD~3..HEAD~2 > libbgfx.so.git
+          aws s3 cp libbgfx.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ ${{env.S3_PARAMS}}
+
+  freebsd-cross:
+    name: FreeBSD Cross
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 4
+      - name: Clone bx, bimg & GENie
+        run: |
+          git clone https://github.com/LWJGL-CI/bx.git ../bx
+          git clone https://github.com/LWJGL-CI/bimg.git ../bimg
+          git clone https://github.com/LWJGL-CI/GENie.git ../GENie
+      - name: Build
+        uses: cross-platform-actions/action@v0.32.0
+        with:
+          operating_system: freebsd
+          architecture: x86-64
+          version: '13.5'
+          memory: 4G
+          shell: bash
+          run: |
+            echo -------------------------
+            echo Install bgfx dependencies
+            echo -------------------------
+            sudo pkg install -y gmake gcc mesa-devel mesa-libs x11/libX11 libglvnd
+            echo ""
+            echo -------------------------
+            echo Build GENie
+            echo -------------------------
+            cd ../GENie
+            gmake
+            echo ""
+            echo -------------------------
+            echo Build
+            echo -------------------------
+            cd ../bgfx
+            ../GENie/bin/bsd/genie --with-shared-lib --with-tools --gcc=freebsd gmake
+            gmake -j2 -R -C .build/projects/gmake-freebsd config=release64 \
+              CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" \
+              bgfx-shared-lib
+            strip .build/freebsd/bin/libbgfx-shared-libRelease.so
+            echo ""
+            echo -------------------------
+            echo Build geometryc
+            echo -------------------------
+            gmake -j2 -R -C .build/projects/gmake-freebsd config=release64 geometryc
+            echo ""
+            echo -------------------------
+            echo Build texturec
+            echo -------------------------
+            gmake -j2 -R -C .build/projects/gmake-freebsd config=release64 texturec
+            echo ""
+            echo -------------------------
+            echo Build texturev
+            echo -------------------------
+            gmake -j2 -R -C .build/projects/gmake-freebsd config=release64 texturev
+            echo ""
+            echo -------------------------
+            echo Build shaderc
+            echo -------------------------
+            gmake -j2 -R -C .build/projects/gmake-freebsd config=release64 shaderc
+      - name: Upload artifact
+        run: aws s3 cp .build/freebsd/bin/libbgfx-shared-libRelease.so s3://lwjgl-build/nightly/freebsd/x64/libbgfx.so ${{env.S3_PARAMS}}
+      - name: Upload tools
+        run: |
+          aws s3 cp .build/freebsd/bin/geometrycRelease s3://lwjgl-build/nightly/freebsd/x64/bgfx-tools/geometryc ${{env.S3_PARAMS}}
+          aws s3 cp .build/freebsd/bin/texturecRelease s3://lwjgl-build/nightly/freebsd/x64/bgfx-tools/texturec ${{env.S3_PARAMS}}
+          aws s3 cp .build/freebsd/bin/texturevRelease s3://lwjgl-build/nightly/freebsd/x64/bgfx-tools/texturev ${{env.S3_PARAMS}}
+          aws s3 cp .build/freebsd/bin/shadercRelease s3://lwjgl-build/nightly/freebsd/x64/bgfx-tools/shaderc ${{env.S3_PARAMS}}
+      - name: Upload git revision
+        run: |
+          git config --global --add safe.directory $PWD
+          git log --first-parent --pretty=format:%H HEAD~3..HEAD~2 > libbgfx.so.git
+          aws s3 cp libbgfx.so.git s3://lwjgl-build/nightly/freebsd/x64/ ${{env.S3_PARAMS}}
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x64, arm64]
+        include:
+          - ARCH: x64
+            PLATFORM: osx-x64
+            GENIE_PARAMS: --with-macos=10.11
+            CC: MACOSX_DEPLOYMENT_TARGET=10.11 CFLAGS=-mmacosx-version-min=10.11 LDFLAGS=-mmacosx-version-min=10.11
+            GENIE_PARAMS_TOOL: --with-macos=10.15
+            CC_TOOL: MACOSX_DEPLOYMENT_TARGET=10.15 CFLAGS=-mmacosx-version-min=10.15 LDFLAGS=-mmacosx-version-min=10.15
+          - ARCH: arm64
+            PLATFORM: osx-arm64
+            GENIE_PARAMS: --with-macos=11.0
+            CC: MACOSX_DEPLOYMENT_TARGET=11.0 CFLAGS=-mmacosx-version-min=11.0 LDFLAGS=-mmacosx-version-min=11.0
+            GENIE_PARAMS_TOOL: --with-macos=11.0
+            CC_TOOL: MACOSX_DEPLOYMENT_TARGET=11.0 CFLAGS=-mmacosx-version-min=11.0 LDFLAGS=-mmacosx-version-min=11.0
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 4
+      - name: Clone bx & bimg
+        run: |
+          git clone https://github.com/LWJGL-CI/bx.git ../bx
+          git clone https://github.com/LWJGL-CI/bimg.git ../bimg
+      - name: Configure bgfx
+        run: ${{matrix.CC}} ../bx/tools/bin/darwin/genie --with-shared-lib --with-tools ${{matrix.GENIE_PARAMS}} --gcc=${{matrix.PLATFORM}} gmake
+      - name: Build bgfx
+        run: |
+          ${{matrix.CC}} make -j8 -C .build/projects/gmake-${{matrix.PLATFORM}} config=release64 CFLAGS="-D BGFX_CONFIG_RENDERER_METAL=1 -D BGFX_CONFIG_RENDERER_OPENGL=1" bgfx-shared-lib
+          strip -u -r .build/${{matrix.PLATFORM}}/bin/libbgfx-shared-libRelease.dylib
+      - name: Configure tools
+        run: ${{matrix.CC_TOOL}} ../bx/tools/bin/darwin/genie --with-shared-lib --with-tools ${{matrix.GENIE_PARAMS_TOOL}} --gcc=${{matrix.PLATFORM}} gmake
+      - name: Build geometryc
+        run: ${{matrix.CC_TOOL}} make -j8 -C .build/projects/gmake-${{matrix.PLATFORM}} config=release64 geometryc
+      - name: Build texturec
+        run: ${{matrix.CC_TOOL}} make -j8 -C .build/projects/gmake-${{matrix.PLATFORM}} config=release64 texturec
+      - name: Build texturev
+        run: ${{matrix.CC_TOOL}} make -j8 -C .build/projects/gmake-${{matrix.PLATFORM}} config=release64 texturev
+      - name: Build shaderc
+        run: ${{matrix.CC_TOOL}} make -j8 -C .build/projects/gmake-${{matrix.PLATFORM}} config=release64 shaderc
+      - name: Upload artifacts
+        run: |
+          aws s3 cp .build/${{matrix.PLATFORM}}/bin/libbgfx-shared-libRelease.dylib s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/libbgfx.dylib ${{env.S3_PARAMS}}
+          aws s3 cp .build/${{matrix.PLATFORM}}/bin/geometrycRelease s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/bgfx-tools/geometryc ${{env.S3_PARAMS}}
+          aws s3 cp .build/${{matrix.PLATFORM}}/bin/texturecRelease s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/bgfx-tools/texturec ${{env.S3_PARAMS}}
+          aws s3 cp .build/${{matrix.PLATFORM}}/bin/texturevRelease s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/bgfx-tools/texturev ${{env.S3_PARAMS}}
+          aws s3 cp .build/${{matrix.PLATFORM}}/bin/shadercRelease s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/bgfx-tools/shaderc ${{env.S3_PARAMS}}
+      - name: Upload git revision
+        run: |
+          git log --first-parent --pretty=format:%H HEAD~3..HEAD~2 > libbgfx.dylib.git
+          aws s3 cp libbgfx.dylib.git s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/ ${{env.S3_PARAMS}}
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x86, x64]
+        include:
+          - ARCH: x86
+            MSVC_ARCH: amd64_x86
+            #MSVC_ARCH: x86
+            #VCTOOLS: x86.x64
+            PLATFORM: x32
+            BUILD: Win32
+            OUTPUT_DIR: win32_vs2022
+          - ARCH: x64
+            MSVC_ARCH: amd64
+            #VCTOOLS: x86.x64
+            PLATFORM: x64
+            BUILD: x64
+            OUTPUT_DIR: win64_vs2022
+#          - ARCH: arm64
+#            MSVC_ARCH: amd64_arm64
+#            #MSVC_ARCH: arm64
+#            #VCTOOLS: ARM64
+#            PLATFORM: arm64
+#            BUILD: arm64
+#            OUTPUT_DIR: win64_vs2022
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.MSVC_ARCH }}
+#      - name: Install Visual Studio 2026 Build Tools
+#        shell: pwsh
+#        run: |
+#          choco install visualstudio2026community --package-parameters "`
+#            --add Microsoft.VisualStudio.Workload.VCTools `
+#            --add Microsoft.VisualStudio.Component.VC.Tools.${{matrix.VCTOOLS}} `
+#            --includeRecommended `
+#            --quiet" `
+#            -y `
+#            --ignore-package-exit-codes=3010
+      - name: Clone bx & bimg
+        run: |
+          git clone https://github.com/LWJGL-CI/bx.git ../bx
+          git clone https://github.com/LWJGL-CI/bimg.git ../bimg
+      - name: Configure build
+        run: ..\bx\tools\bin\windows\genie --with-shared-lib --with-tools vs2022 --platform ${{matrix.PLATFORM}}
+#      - name: Switch to ClangCL for x64 build
+#        run: |
+#          (Get-Content .build/projects/vs2022/bgfx-shared-lib.vcxproj) -replace 'v143', 'ClangCL' | Out-File -encoding UTF8 .build/projects/vs2022/bgfx-shared-lib.vcxproj
+#          (Get-Content .build/projects/vs2022/geometryc.vcxproj) -replace 'v143', 'ClangCL' | Out-File -encoding UTF8 .build/projects/vs2022/geometryc.vcxproj
+#          (Get-Content .build/projects/vs2022/texturec.vcxproj) -replace 'v143', 'ClangCL' | Out-File -encoding UTF8 .build/projects/vs2022/texturec.vcxproj
+#          (Get-Content .build/projects/vs2022/texturev.vcxproj) -replace 'v143', 'ClangCL' | Out-File -encoding UTF8 .build/projects/vs2022/texturev.vcxproj
+#          (Get-Content .build/projects/vs2022/shaderc.vcxproj) -replace 'v143', 'ClangCL' | Out-File -encoding UTF8 .build/projects/vs2022/shaderc.vcxproj
+#        shell: pwsh
+#        if: ${{ matrix.ARCH == 'x64' }}
+      - name: Build bgfx
+        # devenv .build\projects\vs2026\bgfx.slnx /Project bgfx-shared-lib /Build "Release|${{matrix.BUILD}}"
+        # call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -host_arch=amd64 -arch=${{matrix.MSVC_ARCH}}
+        # TOOD: change to bgfx.slnx for vs2026
+        run: msbuild .build\projects\vs2022\bgfx-shared-lib.vcxproj /t:Build /p:Configuration=Release /p:Platform=${{matrix.BUILD}}
+      - name: Build geometryc
+        run: msbuild .build\projects\vs2022\geometryc.vcxproj /t:Build /p:Configuration=Release /p:Platform=${{matrix.BUILD}}
+      - name: Build texturec
+        run: msbuild .build\projects\vs2022\texturec.vcxproj /t:Build /p:Configuration=Release /p:Platform=${{matrix.BUILD}}
+      - name: Build texturev
+        run: msbuild .build\projects\vs2022\texturev.vcxproj /t:Build /p:Configuration=Release /p:Platform=${{matrix.BUILD}}
+      - name: Build shaderc
+        run: msbuild .build\projects\vs2022\shaderc.vcxproj /t:Build /p:Configuration=Release /p:Platform=${{matrix.BUILD}}
+      - name: Upload artifacts
+        run: |
+          aws s3 cp .build/${{matrix.OUTPUT_DIR}}/bin/bgfx-shared-libRelease.dll s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/bgfx.dll ${{env.S3_PARAMS}}
+          aws s3 cp .build/${{matrix.OUTPUT_DIR}}/bin/geometrycRelease.exe s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/bgfx-tools/geometryc.exe ${{env.S3_PARAMS}}
+          aws s3 cp .build/${{matrix.OUTPUT_DIR}}/bin/texturecRelease.exe s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/bgfx-tools/texturec.exe ${{env.S3_PARAMS}}
+          aws s3 cp .build/${{matrix.OUTPUT_DIR}}/bin/texturevRelease.exe s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/bgfx-tools/texturev.exe ${{env.S3_PARAMS}}
+          aws s3 cp .build/${{matrix.OUTPUT_DIR}}/bin/shadercRelease.exe s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/bgfx-tools/shaderc.exe ${{env.S3_PARAMS}}
+      - name: Upload git revision
+        run: |
+          git log --first-parent --pretty=format:%%H HEAD~3..HEAD~2 > bgfx.dll.git
+          aws s3 cp bgfx.dll.git s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/ ${{env.S3_PARAMS}}
