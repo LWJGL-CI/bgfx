@@ -8090,6 +8090,9 @@ void ImGui::ShowAboutWindow(bool* p_open)
 #ifdef __linux__
         ImGui::Text("define: __linux__");
 #endif
+#ifdef __FreeBSD__
+        ImGui::Text("define: __FreeBSD__");
+#endif
 #ifdef __APPLE__
         ImGui::Text("define: __APPLE__");
 #endif
