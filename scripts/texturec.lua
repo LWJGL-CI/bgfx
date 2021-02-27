@@ -33,6 +33,11 @@ project "texturec"
 
 	using_bx()
 
+	configuration { "linux-* or freebsd" }
+        links {
+            "pthread",
+        }
+
 	configuration { "mingw-*" }
 		targetextension ".exe"
 		links {

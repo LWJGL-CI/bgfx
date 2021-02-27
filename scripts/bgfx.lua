@@ -138,10 +138,14 @@ function bgfxProjectBase(_kind, _defines)
 
 	configuration { "osx*" }
 		buildoptions { "-x objective-c++" }  -- additional build option for osx
+		defines {
+            "BGFX_CONFIG_RENDERER_OPENGL=0",
+            "BGFX_CONFIG_RENDERER_OPENGLES=0",
+        }
 		linkoptions {
 			"-framework Cocoa",
 			"-framework IOKit",
-			"-framework OpenGL",
+			--"-framework OpenGL",
 			"-framework QuartzCore",
 			"-weak_framework Metal",
 			"-weak_framework MetalKit",
@@ -149,6 +153,9 @@ function bgfxProjectBase(_kind, _defines)
 			"-weak_framework CoreMedia",
 			"-weak_framework CoreVideo",
 		}
+		--removefiles {
+            --path.join(BGFX_DIR, "src/glcontext**"),
+        --}
 
 	configuration { "not NX32", "not NX64" }
 		includedirs {
@@ -167,10 +174,14 @@ function bgfxProjectBase(_kind, _defines)
 		path.join(BGFX_DIR, "src/**.cpp"),
 		path.join(BGFX_DIR, "src/**.h"),
 		path.join(BGFX_DIR, "scripts/**.natvis"),
+		path.join(BGFX_DIR, "examples/common/nanovg/**.cpp"),
+		path.join(BGFX_DIR, "examples/common/nanovg/**.h"),
 	}
 
 	removefiles {
 		path.join(BGFX_DIR, "src/**.bin.h"),
+		path.join(BGFX_DIR, "examples/common/nanovg/nanovg.cpp"),
+		path.join(BGFX_DIR, "examples/common/nanovg/**.bin.h"),
 	}
 
 	overridefiles(BGFX_DIR, path.join(BGFX_DIR, "../bgfx-agc"), {
