@@ -59,7 +59,7 @@ function bgfxProjectBase(_kind, _defines)
 				"-shared",
 			}
 
-		configuration { "linux-*" }
+		configuration { "linux-* or freebsd" }
 			buildoptions {
 				"-fPIC",
 			}

@@ -144,7 +144,7 @@ extern "C" {
  * For now, only used by some DRI hardware drivers for color/texel packing.
  */
 #if defined(BYTE_ORDER) && defined(BIG_ENDIAN) && BYTE_ORDER == BIG_ENDIAN
-#if defined(__linux__)
+#if defined(__linux__) || defined(__FreeBSD__)
 #include <byteswap.h>
 #define CPU_TO_LE32( x )	bswap_32( x )
 #elif defined(__APPLE__)
