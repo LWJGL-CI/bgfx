@@ -5,7 +5,7 @@
 
 #include "bgfx_p.h"
 
-#if BX_PLATFORM_WINDOWS || BX_PLATFORM_LINUX
+#if BX_PLATFORM_WINDOWS || BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 #	include <renderdoc/renderdoc_app.h>
 
 namespace bgfx

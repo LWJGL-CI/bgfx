@@ -2888,7 +2888,7 @@ namespace bgfx
 						score += RendererType::Direct3D12 == renderer ? -100 : 0;
 					}
 				}
-				else if (BX_ENABLED(BX_PLATFORM_LINUX) )
+				else if (BX_ENABLED(BX_PLATFORM_LINUX) || BX_ENABLED(BX_PLATFORM_BSD) )
 				{
 					score += RendererType::Vulkan     == renderer ? 50 : 0;
 					score += RendererType::OpenGL     == renderer ? 40 : 0;

@@ -1289,6 +1289,7 @@ namespace bgfx
 		preprocessor.setDefaultDefine("BX_PLATFORM_IOS");
 		preprocessor.setDefaultDefine("BX_PLATFORM_VISIONOS");
 		preprocessor.setDefaultDefine("BX_PLATFORM_LINUX");
+		preprocessor.setDefaultDefine("BX_PLATFORM_BSD");
 		preprocessor.setDefaultDefine("BX_PLATFORM_OSX");
 		preprocessor.setDefaultDefine("BX_PLATFORM_PS4");
 		preprocessor.setDefaultDefine("BX_PLATFORM_WINDOWS");
@@ -1386,6 +1387,18 @@ namespace bgfx
 			{
 				preprocessor.setDefine(glslDefine);
 				preprocessor.setDefine(esslDefine);
+			}
+		}
+		else if (0 == bx::strCmpI(platform, "bsd") )
+		{
+			preprocessor.setDefine("BX_PLATFORM_BSD=1");
+			if (profile->lang == ShadingLang::SpirV)
+			{
+				preprocessor.setDefine("BGFX_SHADER_LANGUAGE_SPIRV=1");
+			}
+			else
+			{
+				preprocessor.setDefine(glslDefine);
 			}
 		}
 		else if (0 == bx::strCmpI(platform, "ios")
