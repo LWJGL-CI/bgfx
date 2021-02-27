@@ -2738,7 +2738,7 @@ namespace bgfx
 						score += RendererType::Direct3D12 == renderer ? -100 : 0;
 					}
 				}
-				else if (BX_ENABLED(BX_PLATFORM_LINUX) )
+				else if (BX_ENABLED(BX_PLATFORM_LINUX) || BX_ENABLED(BX_PLATFORM_BSD) )
 				{
 					score += RendererType::Vulkan     == renderer ? 50 : 0;
 					score += RendererType::OpenGL     == renderer ? 40 : 0;
@@ -3483,6 +3483,7 @@ namespace bgfx
 		, callback(NULL)
 		, allocator(NULL)
 	{
+		bx::memCopy(&this->platformData, &g_platformData, sizeof(PlatformData) );
 	}
 
 	void Attachment::init(TextureHandle _handle, Access::Enum _access, uint16_t _layer, uint16_t _numLayers, uint16_t _mip, uint8_t _resolve)
