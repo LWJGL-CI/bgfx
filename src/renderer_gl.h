@@ -9,6 +9,7 @@
 #define BGFX_USE_EGL ( (BGFX_CONFIG_RENDERER_OPENGL || BGFX_CONFIG_RENDERER_OPENGLES) && (0 \
 	|| BX_PLATFORM_ANDROID                                                                  \
 	|| BX_PLATFORM_LINUX                                                                    \
+	|| BX_PLATFORM_BSD                                                                      \
 	|| BX_PLATFORM_NX                                                                       \
 	|| BX_PLATFORM_RPI                                                                      \
 	) )
@@ -23,6 +24,7 @@
 
 #define BGFX_USE_GL_DYNAMIC_LIB (0 \
 	|| BX_PLATFORM_LINUX           \
+	|| BX_PLATFORM_BSD             \
 	|| BX_PLATFORM_WINDOWS         \
 	)
 
@@ -60,7 +62,7 @@
 #	if BGFX_CONFIG_RENDERER_OPENGL >= 31
 #		include <gl/glcorearb.h>
 #	else
-#		if BX_PLATFORM_LINUX
+#		if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 #			define GL_PROTOTYPES
 #			define GL_GLEXT_LEGACY
 #			include <GL/gl.h>
