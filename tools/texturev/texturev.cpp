@@ -1226,7 +1226,7 @@ void associate()
 			}
 		}
 	}
-#elif BX_PLATFORM_LINUX
+#elif BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 
 	std::string mimeType;
 
