@@ -134,7 +134,7 @@ bool openFileSelectionDialog(
 	char tmp[4096];
 	bx::StaticMemoryBlockWriter writer(tmp, sizeof(tmp) );
 
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 	bx::write(&writer, &err
 		, "--file-selection%s --title \"%.*s\" --filename \"%s\""
 		, FileSelectionDialogType::Save == _type ? " --save" : ""
