@@ -820,7 +820,7 @@ namespace bgfx { namespace d3d11
 
 #if USE_D3D11_DYNAMIC_LIB
 			const char* d3d11DllName =
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 				"d3d11.so"
 #else
 				"d3d11.dll"
@@ -1021,7 +1021,7 @@ namespace bgfx { namespace d3d11
 					HRESULT hr = S_OK;
 
 					m_swapEffect =
-#if BX_PLATFORM_LINUX || BX_PLATFORM_WINDOWS
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD || BX_PLATFORM_WINDOWS
 						DXGI_SWAP_EFFECT_FLIP_DISCARD
 #else
 						DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL
@@ -1368,7 +1368,7 @@ namespace bgfx { namespace d3d11
 
 					if (DXGI_FORMAT_UNKNOWN != fmt)
 					{
-						if (BX_ENABLED(BX_PLATFORM_LINUX || BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT) )
+						if (BX_ENABLED(BX_PLATFORM_LINUX || BX_PLATFORM_BSD || BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT) )
 						{
 							D3D11_FEATURE_DATA_FORMAT_SUPPORT data;
 							data.InFormat = fmt;
@@ -1497,7 +1497,7 @@ namespace bgfx { namespace d3d11
 
 					if (DXGI_FORMAT_UNKNOWN != fmtSrgb)
 					{
-						if (BX_ENABLED(BX_PLATFORM_LINUX || BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT) )
+						if (BX_ENABLED(BX_PLATFORM_LINUX || BX_PLATFORM_BSD || BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT) )
 						{
 							struct D3D11_FEATURE_DATA_FORMAT_SUPPORT
 							{

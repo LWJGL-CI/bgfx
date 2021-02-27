@@ -14,7 +14,7 @@
 #	error "GLFW 3.4 or later is required"
 #endif // GLFW_VERSION_*
 
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 #	define GLFW_EXPOSE_NATIVE_WAYLAND
 #	define GLFW_EXPOSE_NATIVE_X11
 #	define GLFW_EXPOSE_NATIVE_GLX
@@ -40,7 +40,7 @@ namespace entry
 {
 	static void* glfwNativeWindowHandle(GLFWwindow* _window)
 	{
-#	if BX_PLATFORM_LINUX
+#	if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 		if (GLFW_PLATFORM_WAYLAND == glfwGetPlatform() )
 		{
 			return glfwGetWaylandWindow(_window);
@@ -833,7 +833,7 @@ namespace entry
 
 	void* getNativeDisplayHandle()
 	{
-#	if BX_PLATFORM_LINUX
+#	if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 		if (GLFW_PLATFORM_WAYLAND == glfwGetPlatform() )
 		{
 			return glfwGetWaylandDisplay();
@@ -847,7 +847,7 @@ namespace entry
 
 	bgfx::NativeWindowHandleType::Enum getNativeWindowHandleType()
 	{
-#	if BX_PLATFORM_LINUX
+#	if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 		if (GLFW_PLATFORM_WAYLAND == glfwGetPlatform() )
 		{
 			return bgfx::NativeWindowHandleType::Wayland;

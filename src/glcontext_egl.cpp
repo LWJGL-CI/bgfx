@@ -84,7 +84,7 @@ EGL_IMPORT
 	void* eglOpen()
 	{
 	    void* handle = bx::dlopen(
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 			"libEGL.so.1"
 #else
 			"libEGL." BX_DL_EXT
@@ -569,6 +569,7 @@ WL_EGL_IMPORT
 	{
 		return BX_ENABLED(0
 			| BX_PLATFORM_LINUX
+			| BX_PLATFORM_BSD
 			| BX_PLATFORM_WINDOWS
 			| BX_PLATFORM_ANDROID
 			)
@@ -628,10 +629,10 @@ WL_EGL_IMPORT
 	{
 		BX_TRACE("Import:");
 
-#	if BX_PLATFORM_WINDOWS || BX_PLATFORM_LINUX
+#	if BX_PLATFORM_WINDOWS || BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 #		if BX_PLATFORM_WINDOWS
 #			define LIBRARY_NAME "libGL.dll"
-#		elif BX_PLATFORM_LINUX
+#		elif BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 #			if BGFX_CONFIG_RENDERER_OPENGL
 #				define LIBRARY_NAME "libGL.so.1"
 #			else
