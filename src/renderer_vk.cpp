@@ -387,7 +387,7 @@ VK_IMPORT_DEVICE
 
 #	if BX_PLATFORM_ANDROID
 			KHR_android_surface,
-#	elif BX_PLATFORM_LINUX
+#	elif BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 			KHR_wayland_surface,
 			KHR_xlib_surface,
 			KHR_xcb_surface,
@@ -426,7 +426,7 @@ VK_IMPORT_DEVICE
 		{ "VK_KHR_get_physical_device_properties2", 1, false, false, true,                                                          Layer::Count },
 #	if BX_PLATFORM_ANDROID
 		{ VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,    1, false, false, true,                                                          Layer::Count },
-#	elif BX_PLATFORM_LINUX
+#	elif BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 		{ VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME,    1, false, false, true,                                                          Layer::Count },
 		{ VK_KHR_XLIB_SURFACE_EXTENSION_NAME,       1, false, false, true,                                                          Layer::Count },
 		{ VK_KHR_XCB_SURFACE_EXTENSION_NAME,        1, false, false, true,                                                          Layer::Count },
@@ -7436,7 +7436,7 @@ retry:
 				BX_WARN(VK_SUCCESS == result, "vkCreateAndroidSurfaceKHR failed %d: %s.", result, getName(result) );
 			}
 		}
-#elif BX_PLATFORM_LINUX
+#elif BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 		{
 			if (g_platformData.type == bgfx::NativeWindowHandleType::Wayland)
 			{

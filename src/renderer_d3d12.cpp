@@ -8,7 +8,7 @@
 #if BGFX_CONFIG_RENDERER_DIRECT3D12
 #	include "renderer_d3d12.h"
 
-#if !BX_PLATFORM_WINDOWS && !BX_PLATFORM_LINUX
+#if !BX_PLATFORM_WINDOWS && !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 #	include <inspectable.h>
 #	if BX_PLATFORM_WINRT
 #		include <windows.ui.xaml.media.dxinterop.h>
@@ -537,7 +537,7 @@ namespace bgfx { namespace d3d12
 
 	static void initHeapProperties(ID3D12Device* _device)
 	{
-#if BX_PLATFORM_LINUX || BX_PLATFORM_WINDOWS
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD || BX_PLATFORM_WINDOWS
 		initHeapProperties(_device, s_heapProperties[HeapProperty::Default ].m_properties);
 		initHeapProperties(_device, s_heapProperties[HeapProperty::Texture ].m_properties);
 		initHeapProperties(_device, s_heapProperties[HeapProperty::Upload  ].m_properties);
@@ -664,7 +664,7 @@ namespace bgfx { namespace d3d12
 	static PFN_D3D12_GET_DEBUG_INTERFACE          D3D12GetDebugInterface;
 	static PFN_D3D12_SERIALIZE_ROOT_SIGNATURE     D3D12SerializeRootSignature;
 
-#	if !BX_PLATFORM_LINUX
+#	if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 	typedef HANDLE  (WINAPI* PFN_CREATE_EVENT_EX_A)(LPSECURITY_ATTRIBUTES _attrs, LPCSTR _name, DWORD _flags, DWORD _access);
 	static PFN_CREATE_EVENT_EX_A CreateEventExA;
 #	endif // !BX_PLATFORM_LINUX
@@ -803,7 +803,7 @@ namespace bgfx { namespace d3d12
 
 #if USE_D3D12_DYNAMIC_LIB
 
-#	if !BX_PLATFORM_LINUX
+#	if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 			m_kernel32Dll = bx::dlopen("kernel32.dll");
 			if (NULL == m_kernel32Dll)
 			{
@@ -825,7 +825,7 @@ namespace bgfx { namespace d3d12
 
 			{
 				const char* d3d12DllName =
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 					"libd3d12.so"
 #else
 					"d3d12.dll"
@@ -864,7 +864,7 @@ namespace bgfx { namespace d3d12
 			}
 #endif // USE_D3D12_DYNAMIC_LIB
 
-#if !BX_PLATFORM_LINUX
+#if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 			if (!m_dxgi.init(g_caps) )
 			{
 				goto error;
@@ -884,7 +884,7 @@ namespace bgfx { namespace d3d12
 			}
 			else
 			{
-#if BX_PLATFORM_LINUX || BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD || BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT
 				if (_init.debug
 				||  _init.profile)
 				{
@@ -942,7 +942,7 @@ namespace bgfx { namespace d3d12
 				for (uint32_t ii = 0; ii < BX_COUNTOF(featureLevel) && FAILED(hr); ++ii)
 				{
 					hr = D3D12CreateDevice(
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 							NULL
 #else
 							m_dxgi.m_adapter
@@ -994,7 +994,7 @@ namespace bgfx { namespace d3d12
 				}
 			}
 
-#if !BX_PLATFORM_LINUX
+#if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 			m_dxgi.update(m_device);
 #endif // !BX_PLATFORM_LINUX
 
@@ -1015,7 +1015,7 @@ namespace bgfx { namespace d3d12
 
 			BX_TRACE("Device interface version IID_ID3D12Device%d.", m_deviceInterfaceVersion);
 
-#if !BX_PLATFORM_LINUX
+#if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 			if (BGFX_PCI_ID_NVIDIA != m_dxgi.m_adapterDesc.VendorId)
 			{
 				m_nvapi.shutdown();
@@ -1290,7 +1290,7 @@ namespace bgfx { namespace d3d12
 
 				if (NULL != m_scd.nwh)
 				{
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 					hr = E_FAIL;
 #else
 					hr = m_dxgi.createSwapChain(
@@ -1821,7 +1821,7 @@ namespace bgfx { namespace d3d12
 				postReset();
 
 				m_batch.create(4<<10);
-#if !BX_PLATFORM_LINUX
+#if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 				m_batch.setIndirectMode(BGFX_PCI_ID_NVIDIA != m_dxgi.m_adapterDesc.VendorId && BGFX_PCI_ID_MICROSOFT != m_dxgi.m_adapterDesc.VendorId);
 #endif // !BX_PLATFORM_LINUX
 
@@ -1874,7 +1874,7 @@ namespace bgfx { namespace d3d12
 
 			case ErrorState::CreatedDXGIFactory:
 				DX_RELEASE(m_device,  0);
-#if !BX_PLATFORM_LINUX
+#if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 				m_dxgi.shutdown();
 #endif // !BX_PLATFORM_LINUX
 				[[fallthrough]];
@@ -1965,7 +1965,7 @@ namespace bgfx { namespace d3d12
 			DX_RELEASE(m_device, 0);
 
 			m_nvapi.shutdown();
-#if !BX_PLATFORM_LINUX
+#if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 			m_dxgi.shutdown();
 #endif // !BX_PLATFORM_LINUX
 
@@ -2010,7 +2010,7 @@ namespace bgfx { namespace d3d12
 				{
 					presentFlags |= DXGI_PRESENT_RESTART;
 				}
-#if !BX_PLATFORM_LINUX
+#if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 				else if (m_dxgi.tearingSupported() )
 				{
 					presentFlags |= DXGI_PRESENT_ALLOW_TEARING;
@@ -2807,7 +2807,7 @@ namespace bgfx { namespace d3d12
 						DX_RELEASE(m_swapChain, 0);
 
 						HRESULT hr;
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 						hr = E_FAIL;
 #else
 						hr = m_dxgi.createSwapChain(
@@ -3856,7 +3856,7 @@ namespace bgfx { namespace d3d12
 			m_commandList = _alloc ? m_cmd.alloc() : NULL;
 		}
 
-#if !BX_PLATFORM_LINUX
+#if !BX_PLATFORM_LINUX && !BX_PLATFORM_BSD
 		Dxgi m_dxgi;
 #endif // !BX_PLATFORM_LINUX
 
@@ -4403,7 +4403,7 @@ namespace bgfx { namespace d3d12
 		ID3D12CommandList* commandLists[] = { commandList.m_commandList };
 		m_commandQueue->ExecuteCommandLists(BX_COUNTOF(commandLists), commandLists);
 
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 		commandList.m_event = NULL;
 #else
 		commandList.m_event = CreateEventExA(NULL, NULL, 0, EVENT_ALL_ACCESS);
@@ -4455,7 +4455,7 @@ namespace bgfx { namespace d3d12
 	bool CommandQueueD3D12::consume(uint32_t _ms)
 	{
 		CommandList& commandList = m_commandList[m_control.m_read];
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 		BX_UNUSED(commandList, _ms);
 #else
 		if (WAIT_OBJECT_0 == WaitForSingleObject(commandList.m_event, _ms) )
@@ -7655,7 +7655,7 @@ namespace bgfx { namespace d3d12
 					, BGFX_REV_NUMBER
 					);
 
-#if BX_PLATFORM_LINUX
+#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
 				const DXGI_ADAPTER_DESC desc = {};
 #else
 				const DXGI_ADAPTER_DESC& desc = m_dxgi.m_adapterDesc;
