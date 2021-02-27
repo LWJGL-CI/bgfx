@@ -226,7 +226,7 @@ project "spirv-opt"
 			"/wd4706", -- warning C4706: assignment within conditional expression
 		}
 
-	configuration { "mingw* or linux* or osx*" }
+	configuration { "mingw* or linux* or freebsd or osx*" }
 		buildoptions {
 			"-Wno-switch",
 		}
@@ -282,7 +282,7 @@ project "spirv-cross"
 			"/wd4715", -- warning C4715: '': not all control paths return a value
 		}
 
-	configuration { "mingw* or linux* or osx*" }
+	configuration { "mingw* or linux* or freebsd or osx*" }
 		buildoptions {
 			"-Wno-type-limits",
 		}
@@ -354,7 +354,7 @@ project "glslang"
 			"-Wno-maybe-uninitialized",
 		}
 
-	configuration { "mingw* or linux* or osx*" }
+	configuration { "mingw* or linux* or freebsd or osx*" }
 		buildoptions {
 			"-fno-strict-aliasing", -- glslang has bugs if strict aliasing is used.
 			"-Wno-ignored-qualifiers",
@@ -614,7 +614,7 @@ project "glsl-optimizer"
 			"/wd4996", -- warning C4996: 'strdup': The POSIX name for this item is deprecated. Instead, use the ISO C++ conformant name: _strdup.
 		}
 
-	configuration { "mingw* or linux* or osx*" }
+	configuration { "mingw* or linux* or freebsd or osx*" }
 		buildoptions {
 			"-fno-strict-aliasing", -- glsl-optimizer has bugs if strict aliasing is used.
 
@@ -745,7 +745,7 @@ project "shaderc"
 			"psapi",
 		}
 
-	configuration { "osx* or linux*" }
+	configuration { "osx* or linux* or freebsd" }
 		links {
 			"pthread",
 		}

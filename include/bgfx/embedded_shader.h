@@ -22,6 +22,7 @@
 #ifndef BGFX_PLATFORM_SUPPORTS_DXBC
 #	define BGFX_PLATFORM_SUPPORTS_DXBC (0 \
 		|| BX_PLATFORM_LINUX              \
+		|| BX_PLATFORM_BSD                \
 		|| BX_PLATFORM_WINDOWS            \
 		|| BX_PLATFORM_WINRT              \
 		|| BX_PLATFORM_XBOXONE            \
@@ -41,6 +42,7 @@
 		|| BX_PLATFORM_EMSCRIPTEN         \
 		|| BX_PLATFORM_IOS                \
 		|| BX_PLATFORM_LINUX              \
+		|| BX_PLATFORM_BSD                \
 		|| BX_PLATFORM_OSX                \
 		|| BX_PLATFORM_RPI                \
 		|| BX_PLATFORM_VISIONOS           \
@@ -51,6 +53,7 @@
 #ifndef BGFX_PLATFORM_SUPPORTS_GLSL
 #	define BGFX_PLATFORM_SUPPORTS_GLSL (0 \
 		|| BX_PLATFORM_LINUX              \
+		|| BX_PLATFORM_BSD                \
 		|| BX_PLATFORM_OSX                \
 		|| BX_PLATFORM_WINDOWS            \
 		)
@@ -82,6 +85,7 @@
 		|| BX_PLATFORM_ANDROID             \
 		|| BX_PLATFORM_EMSCRIPTEN          \
 		|| BX_PLATFORM_LINUX               \
+		|| BX_PLATFORM_BSD                 \
 		|| BX_PLATFORM_WINDOWS             \
 		|| BX_PLATFORM_OSX                 \
 		|| BX_PLATFORM_NX                  \
