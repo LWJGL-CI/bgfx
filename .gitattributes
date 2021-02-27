@@ -1,4 +1,6 @@
+*	-text
 *.bin binary diff=hex
+
 *.c   eol=lf
 *.cpp eol=lf
 *.h   eol=lf
