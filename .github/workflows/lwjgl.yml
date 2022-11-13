@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ARCH: [x64, arm32, arm64]
+        ARCH: [x64, arm32, arm64, ppc64el]
         include:
           # -----
           - ARCH: x64
