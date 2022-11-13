@@ -40,6 +40,13 @@ jobs:
             CROSS_PACKAGES: libgl1-mesa-dev:arm64 x11proto-dev:arm64 libx11-dev:arm64
             OUTPUT_DIR: linux64_arm_gcc
           # -----
+          - ARCH: ppc64el
+            runner: ubuntu-18.04
+            CROSS_ARCH: arm64
+            PACKAGES: gcc-powerpc64le-linux-gnu g++-powerpc64le-linux-gnu libc6-dev-ppc64el-cross
+            CROSS_PACKAGES: libgl1-mesa-dev:ppc64el x11proto-dev:ppc64el libx11-dev:ppc64el
+            OUTPUT_DIR: linux64_ppc_gcc
+          # -----
 #          - ARCH: mips64
 #            runner: ubuntu-18.04
 #            CROSS_ARCH: mips64el
@@ -70,7 +77,13 @@ jobs:
           then
             sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
             sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
-            sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+            if [[ "${{matrix.ARCH}}" == "arm32" || "${{matrix.ARCH}}" == "arm64" ]]
+            then
+              sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+            elif [[ "${{matrix.ARCH}}" == "ppc64el" ]]
+            then
+              sudo sed -i 's/amd64,i386/ppc64el,ppc64el/' /etc/apt/sources.list.d/ports.list
+            fi
             sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
           else
             sudo rm -rf /etc/apt/sources.list
@@ -112,7 +125,24 @@ jobs:
           make -R -C .build/projects/gmake-linux-arm-gcc config=release64 CXX="aarch64-linux-gnu-g++" CC="aarch64-linux-gnu-gcc" CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" bgfx-shared-lib
           aarch64-linux-gnu-strip .build/linux64_arm_gcc/bin/libbgfx-shared-libRelease.so
         name: Build bgfx (arm64)
-        if: contains(matrix.ARCH, 'arm64')
+        if: contains(matrix.ARCH, 'ppc64el')
+      - run: | #sudo ln -s /usr/lib/powerpc64le-linux-gnu/mesa/libGL.so.1 /usr/lib/libGL.so
+          sed -i 's/strip -s/powerpc64le-linux-gnu-strip/' ../bx/scripts/toolchain.lua
+          ../GENie/bin/linux/genie --with-shared-lib --gcc=linux-ppc-gcc gmake
+          sed -i 's/ -m64//' .build/projects/gmake-linux-ppc-gcc/bgfx.make
+          sed -i 's/ -m64//' .build/projects/gmake-linux-ppc-gcc/bgfx-shared-lib.make
+          sed -i 's/ -m64//' .build/projects/gmake-linux-ppc-gcc/bimg.make
+          sed -i 's/ -m64//' .build/projects/gmake-linux-ppc-gcc/bimg_decode.make
+          sed -i 's/ -m64//' .build/projects/gmake-linux-ppc-gcc/bx.make
+          sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-ppc-gcc/bgfx.make
+          sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-ppc-gcc/bgfx-shared-lib.make
+          sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-ppc-gcc/bimg.make
+          sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-ppc-gcc/bimg_decode.make
+          sed -i 's/linux32/linux64/g' .build/projects/gmake-linux-ppc-gcc/bx.make
+          make -R -C .build/projects/gmake-linux-ppc-gcc config=release64 CXX="powerpc64le-linux-gnu-g++" CC="powerpc64le-linux-gnu-gcc" CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" bgfx-shared-lib
+          powerpc64le-linux-gnu-strip .build/linux64_ppc_gcc/bin/libbgfx-shared-libRelease.so
+        name: Build bgfx (ppc64el)
+        if: contains(matrix.ARCH, 'ppc64el')
       - run: | #sudo ln -s /usr/lib/mips64el-linux-gnuabi64/mesa/libGL.so.1 /usr/lib/libGL.so
           sed -i 's/strip -s/mips64el-linux-gnuabi64-strip/' ../bx/scripts/toolchain.lua
           ../GENie/bin/linux/genie --with-shared-lib --gcc=linux-mips-gcc gmake
