@@ -42,7 +42,7 @@ jobs:
           # -----
           - ARCH: ppc64el
             runner: ubuntu-18.04
-            CROSS_ARCH: arm64
+            CROSS_ARCH: ppc64el
             PACKAGES: gcc-powerpc64le-linux-gnu g++-powerpc64le-linux-gnu libc6-dev-ppc64el-cross
             CROSS_PACKAGES: libgl1-mesa-dev:ppc64el x11proto-dev:ppc64el libx11-dev:ppc64el
             OUTPUT_DIR: linux64_ppc_gcc
