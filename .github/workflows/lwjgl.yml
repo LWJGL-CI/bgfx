@@ -97,24 +97,33 @@ jobs:
     name: Linux Cross
     runs-on: ubuntu-latest
     container:
-      image: ubuntu:18.04
+      image: ${{matrix.CONTAINER}}
     strategy:
       fail-fast: false
       matrix:
-        ARCH: [arm32, arm64]
+        ARCH: [arm32, arm64, riscv64]
         include:
           # -----
           - ARCH: arm32
             CROSS_ARCH: armhf
+            CONTAINER: ubuntu:18.04
             PACKAGES: gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6-dev-armhf-cross
             CROSS_PACKAGES: libgl1-mesa-dev:armhf x11proto-dev:armhf libx11-dev:armhf
             OUTPUT_DIR: linux32_arm_gcc
           # -----
           - ARCH: arm64
             CROSS_ARCH: arm64
+            CONTAINER: ubuntu:18.04
             PACKAGES: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
             CROSS_PACKAGES: libgl1-mesa-dev:arm64 x11proto-dev:arm64 libx11-dev:arm64
             OUTPUT_DIR: linux64_arm_gcc
+          # -----
+          - ARCH: riscv64
+            CROSS_ARCH: riscv64
+            CONTAINER: ubuntu:20.04
+            PACKAGES: gcc-riscv64-linux-gnu g++-riscv64-linux-gnu libc6-dev-riscv64-cross
+            CROSS_PACKAGES: libgl1-mesa-dev:riscv64 x11proto-dev:riscv64 libx11-dev:riscv64
+            OUTPUT_DIR: linux_riscv64_gcc
     env:
       LWJGL_ARCH: ${{matrix.ARCH}}
     steps:
@@ -128,6 +137,9 @@ jobs:
           apt-key add kitware-archive-latest.asc
           add-apt-repository -y 'deb https://apt.kitware.com/ubuntu/ bionic main'
           add-apt-repository -y ppa:git-core/ppa
+        name: Update apt repositories
+        if: ${{ matrix.CONTAINER == 'ubuntu:18.04' }}
+      - run: |
           apt-get -y update
           DEBIAN_FRONTEND=noninteractive apt-get -yq install awscli git
         name: Upgrade git
@@ -148,7 +160,7 @@ jobs:
       - run: |
           sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
           grep "ubuntu.com/ubuntu" /etc/apt/sources.list | tee /etc/apt/sources.list.d/ports.list
-          sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+          sed -i 's/amd64,i386/${{matrix.CROSS_ARCH}}/' /etc/apt/sources.list.d/ports.list
           sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
           dpkg --add-architecture ${{matrix.CROSS_ARCH}}
           apt-get update || true
@@ -179,6 +191,18 @@ jobs:
           aarch64-linux-gnu-strip .build/linux64_arm_gcc/bin/libbgfx-shared-libRelease.so
         name: Build bgfx (arm64)
         if: contains(matrix.ARCH, 'arm64')
+      - run: | #sudo ln -s /usr/lib/riscv64-linux-gnu/mesa/libGL.so.1 /usr/lib/libGL.so
+          sed -i 's/strip -s/riscv64-linux-gnu-strip/' ../bx/scripts/toolchain.lua
+          ../GENie/bin/linux/genie --with-shared-lib --gcc=linux-riscv64-gcc gmake
+          sed -i 's/ -m64//' .build/projects/gmake-linux-riscv64-gcc/bgfx.make
+          sed -i 's/ -m64//' .build/projects/gmake-linux-riscv64-gcc/bgfx-shared-lib.make
+          sed -i 's/ -m64//' .build/projects/gmake-linux-riscv64-gcc/bimg.make
+          sed -i 's/ -m64//' .build/projects/gmake-linux-riscv64-gcc/bimg_decode.make
+          sed -i 's/ -m64//' .build/projects/gmake-linux-riscv64-gcc/bx.make
+          make -R -C .build/projects/gmake-linux-riscv64-gcc config=release64 CXX="riscv64-linux-gnu-g++" CC="riscv64-linux-gnu-gcc" CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" bgfx-shared-lib
+          riscv64-linux-gnu-strip .build/linux_riscv64_gcc/bin/libbgfx-shared-libRelease.so
+        name: Build bgfx (riscv64)
+        if: contains(matrix.ARCH, 'riscv64')
       - run: aws s3 cp .build/${{matrix.OUTPUT_DIR}}/bin/libbgfx-shared-libRelease.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/libbgfx.so $S3_PARAMS
         name: Upload artifact
       - run: |
