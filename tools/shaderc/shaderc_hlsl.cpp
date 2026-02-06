@@ -14,8 +14,13 @@
 #endif // defined(__MINGW32__)
 
 #define COM_NO_WINDOWS_H
-#include <d3dcompiler.h>
-#include <d3d11shader.h>
+#if BX_PLATFORM_LINUX || BX_PLATFORM_OSX
+#	include <wsl/winadapter.h>
+#	include <d3d4linux.h>
+#else
+#	include <d3dcompiler.h>
+#	include <d3d11shader.h>
+#endif // BX_PLATFORM_LINUX || BX_PLATFORM_OSX
 #include <bx/os.h>
 
 #ifndef D3D_SVF_USED
@@ -24,36 +29,40 @@
 
 namespace bgfx { namespace hlsl
 {
-	typedef HRESULT(WINAPI* PFN_D3D_COMPILE)(_In_reads_bytes_(SrcDataSize) LPCVOID pSrcData
-		, _In_ SIZE_T SrcDataSize
-		, _In_opt_ LPCSTR pSourceName
-		, _In_reads_opt_(_Inexpressible_(pDefines->Name != NULL) ) CONST D3D_SHADER_MACRO* pDefines
-		, _In_opt_ ID3DInclude* pInclude
-		, _In_opt_ LPCSTR pEntrypoint
-		, _In_ LPCSTR pTarget
-		, _In_ UINT Flags1
-		, _In_ UINT Flags2
-		, _Out_ ID3DBlob** ppCode
-		, _Always_(_Outptr_opt_result_maybenull_) ID3DBlob** ppErrorMsgs
+	typedef HRESULT(WINAPI* PFN_D3D_COMPILE)(
+		  LPCVOID pSrcData
+		, SIZE_T SrcDataSize
+		, LPCSTR pSourceName
+		, CONST D3D_SHADER_MACRO* pDefines
+		, ID3DInclude* pInclude
+		, LPCSTR pEntrypoint
+		, LPCSTR pTarget
+		, UINT Flags1
+		, UINT Flags2
+		, ID3DBlob** ppCode
+		, ID3DBlob** ppErrorMsgs
 		);
 
-	typedef HRESULT(WINAPI* PFN_D3D_DISASSEMBLE)(_In_reads_bytes_(SrcDataSize) LPCVOID pSrcData
-		, _In_ SIZE_T SrcDataSize
-		, _In_ UINT Flags
-		, _In_opt_ LPCSTR szComments
-		, _Out_ ID3DBlob** ppDisassembly
+	typedef HRESULT(WINAPI* PFN_D3D_DISASSEMBLE)(
+		  LPCVOID pSrcData
+		, SIZE_T SrcDataSize
+		, UINT Flags
+		, LPCSTR szComments
+		, ID3DBlob** ppDisassembly
 		);
 
-	typedef HRESULT(WINAPI* PFN_D3D_REFLECT)(_In_reads_bytes_(SrcDataSize) LPCVOID pSrcData
-		, _In_ SIZE_T SrcDataSize
-		, _In_ REFIID pInterface
-		, _Out_ void** ppReflector
+	typedef HRESULT(WINAPI* PFN_D3D_REFLECT)(
+		  LPCVOID pSrcData
+		, SIZE_T SrcDataSize
+		, REFIID pInterface
+		, void** ppReflector
 		);
 
-	typedef HRESULT(WINAPI* PFN_D3D_STRIP_SHADER)(_In_reads_bytes_(BytecodeLength) LPCVOID pShaderBytecode
-		, _In_ SIZE_T BytecodeLength
-		, _In_ UINT uStripFlags
-		, _Out_ ID3DBlob** ppStrippedBlob
+	typedef HRESULT(WINAPI* PFN_D3D_STRIP_SHADER)(
+		  LPCVOID pShaderBytecode
+		, SIZE_T BytecodeLength
+		, UINT uStripFlags
+		, ID3DBlob** ppStrippedBlob
 		);
 
 	PFN_D3D_COMPILE      D3DCompile;
@@ -64,7 +73,7 @@ namespace bgfx { namespace hlsl
 	struct D3DCompiler
 	{
 		const char* fileName;
-		const GUID  IID_ID3D11ShaderReflection;
+		const GUID  reflectionGuid;
 	};
 
 	static const D3DCompiler s_d3dcompiler[] =
@@ -78,10 +87,59 @@ namespace bgfx { namespace hlsl
 	};
 
 	static const D3DCompiler* s_compiler = NULL;
+
+#if BX_PLATFORM_WINDOWS
 	static void* s_d3dcompilerdll = NULL;
+#endif // BX_PLATFORM_WINDOWS
 
 	const D3DCompiler* load(bx::WriterI* _messageWriter)
 	{
+#if BX_PLATFORM_LINUX || BX_PLATFORM_OSX
+		BX_TRACE("Using d3d4linux for HLSL compilation (Wine-based D3DCompiler).");
+
+		bx::Error messageErr;
+		bx::FileInfo fi;
+
+		bx::FilePath executableDir = bx::FilePath(bx::Dir::Executable).getPath();
+
+		bx::FilePath d3d4linuxExe(executableDir);
+		d3d4linuxExe.join("../windows/d3d4linux.exe");
+
+		if (bx::stat(fi, d3d4linuxExe) )
+		{
+			bx::setEnv("D3D4LINUX_EXE", d3d4linuxExe);
+		}
+		else
+		{
+			bx::write(_messageWriter, &messageErr, "Error: `%s` not found.\n", d3d4linuxExe.getCPtr() );
+			return NULL;
+		}
+
+		bx::FilePath d3d4linuxDll(executableDir);
+		d3d4linuxDll.join("../windows/d3dcompiler_47.dll");
+
+		if (bx::stat(fi, d3d4linuxDll) )
+		{
+			bx::setEnv("D3D4LINUX_DLL", d3d4linuxDll);
+		}
+		else
+		{
+			bx::write(_messageWriter, &messageErr, "Error: `%s` not found.\n", d3d4linuxDll.getCPtr() );
+			return NULL;
+		}
+
+		if (g_verbose)
+		{
+			bx::setEnv("D3D4LINUX_VERBOSE", "1");
+		}
+
+		D3DCompile     = (PFN_D3D_COMPILE     )&d3d4linux::compile;
+		D3DReflect     = (PFN_D3D_REFLECT     )&d3d4linux::reflect;
+		D3DDisassemble = (PFN_D3D_DISASSEMBLE )&d3d4linux::disassemble;
+		D3DStripShader = (PFN_D3D_STRIP_SHADER)&d3d4linux::strip_shader;
+
+		return &s_d3dcompiler[0];
+#else
 		if (NULL != s_d3dcompilerdll)
 		{
 			return s_compiler;
@@ -109,6 +167,7 @@ namespace bgfx { namespace hlsl
 			||  NULL == D3DStripShader)
 			{
 				bx::dlclose(s_d3dcompilerdll);
+				s_d3dcompilerdll = NULL;
 				continue;
 			}
 
@@ -124,15 +183,18 @@ namespace bgfx { namespace hlsl
 
 		bx::write(_messageWriter, &messageErr, "Error: Unable to open D3DCompiler_*.dll shader compiler.\n");
 		return NULL;
+#endif // BX_PLATFORM_LINUX || BX_PLATFORM_OSX
 	}
 
 	void unload()
 	{
+#if BX_PLATFORM_WINDOWS
 		if (NULL != s_d3dcompilerdll)
 		{
 			bx::dlclose(s_d3dcompilerdll);
 			s_d3dcompilerdll = NULL;
 		}
+#endif // BX_PLATFORM_WINDOWS
 
 		s_compiler     = NULL;
 		D3DCompile     = NULL;
@@ -214,7 +276,7 @@ namespace bgfx { namespace hlsl
 			const UniformRemap& remap = s_uniformRemap[ii];
 
 			if (remap.paramClass == constDesc.Class
-			&&  remap.paramType == constDesc.Type)
+			&&  remap.paramType  == constDesc.Type)
 			{
 				if (D3D_SVC_MATRIX_COLUMNS != constDesc.Class)
 				{
@@ -222,7 +284,7 @@ namespace bgfx { namespace hlsl
 				}
 
 				if (remap.columns == constDesc.Columns
-				&&  remap.rows == constDesc.Rows)
+				&&  remap.rows    == constDesc.Rows)
 				{
 					return remap.id;
 				}
@@ -249,9 +311,10 @@ namespace bgfx { namespace hlsl
 		ID3D11ShaderReflection* reflect = NULL;
 		HRESULT hr = D3DReflect(_code->GetBufferPointer()
 			, _code->GetBufferSize()
-			, s_compiler->IID_ID3D11ShaderReflection
+			, s_compiler->reflectionGuid
 			, (void**)&reflect
 			);
+
 		if (FAILED(hr) )
 		{
 			bx::write(_messageWriter, &messageErr, "Error: D3DReflect failed 0x%08x\n", (uint32_t)hr);
@@ -427,6 +490,11 @@ namespace bgfx { namespace hlsl
 		bx::strCat(profileAndType, BX_COUNTOF(profileAndType), profile);
 
 		s_compiler = load(_messageWriter);
+		if (NULL == s_compiler)
+		{
+			bx::write(_messageWriter, &messageErr, "Error: Unabled to load D3D compiler!\n");
+			return false;
+		}
 
 		bool result = false;
 		bool debug = _options.debugInformation;
@@ -519,7 +587,7 @@ namespace bgfx { namespace hlsl
 			}
 
 			printCode(_code.c_str(), line, start, end, column);
-			bx::write(_messageWriter, &messageErr, "Error: D3DCompile failed 0x%08x %s\n", (uint32_t)hr, log);
+			bx::write(_messageWriter, &messageErr, "Error: D3DCompile failed 0x%08x `%s`\n", (uint32_t)hr, log);
 			errorMsg->Release();
 			return false;
 		}
